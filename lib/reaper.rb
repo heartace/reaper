@@ -346,12 +346,12 @@ module Reaper
     
     desc "login", "Login to your Harvest account to authorize Reaper"
     def login
-      openWebpage "https://id.getharvest.com/oauth2/authorize?client_id=#{HARVEST_CLIENT_ID}&response_type=token"
+      Reaper.openWebpage "https://id.getharvest.com/oauth2/authorize?client_id=#{HARVEST_CLIENT_ID}&response_type=token"
       
       start_login_server
   
       if $token
-        me = request 'users/me'
+        me = Reaper.request 'users/me'
         $user_id = me['id']
         puts "Harvest user ID: #{$user_id}"
   
