@@ -13,7 +13,6 @@ require 'ruby-progressbar'
 
 module Reaper
   class Error < StandardError; end
-  # Your code goes here...
 
   HARVEST_CLIENT_ID = 'c4CbEqRlWx1ziSITWP03BwjN'
   
@@ -448,14 +447,14 @@ module Reaper
   
       print_time_entries mon, fri, entries
 
-      raw_entries
+      return raw_entries, entries
     end
   
     desc "delete DATE/WEEK-ALIAS", "Delete all Harvest time entries in the given week"
     def delete(date_str)
       mon, fri = get_week_range_from_date_str date_str
 
-      entries = show date_str
+      entries, _ = show date_str
       
       if !entries.empty?
         puts "Delete #{entries.size} entrires from #{mon} to #{fri}? (Y/n)"
@@ -482,141 +481,9 @@ module Reaper
     end
   
     desc "submit DATE/WEEK-ALIAS", "Submit Harvest time entries for you based on the configuration"
+    option :excluded, :type => :string
     def submit(date_str)
-      mon, fri = get_week_range_from_date_str date_str
-
-      Reaper.check_auth
-
-      abort 'Cannot find Reaper configuration. Please run `reaper config update` first.' unless Reaper.load_config
-
-      existing_entries = show date_str
-      
-      if existing_entries && !existing_entries.empty?
-        puts ''
-        abort "You have existing time entries within the specified date range. Reaper submit won't work in this case.\nIf you are sure they can be removed, please run `reaper delete #{date_str}` first."
-      end
-      
-      hours_per_day = 8
-      days = 5
-
-      dates = []
-      days.times { |n| dates << mon + n }
-
-      hours = []
-      
-      negative_offset_days = 0
-      days.times do |n|
-        # we don't want you to always work less than 8 hours, 
-        # 2 is the max number of your less working days
-        is_positive_offset = negative_offset_days <= 4 ? [true, false].sample : true
-        negative_offset_days += 1 unless is_positive_offset
-  
-        offset = is_positive_offset ? $config[:daily_positive_offset] : $config[:daily_negative_offset]
-        offset = round_hours(rand() * offset) * (is_positive_offset ? 1 : -1)
-        hours << offset + hours_per_day
-      end
-
-      total_hours = hours.inject(:+)
-
-      tasks = $config[:tasks]
-
-      tasks_hours = 0
-      tasks.each_with_index do |t, i|
-        if i < tasks.size - 1
-          t[:hours] = round_hours(total_hours * t[:percentage])
-          tasks_hours += t[:hours]
-        else
-          t[:hours] = total_hours - tasks_hours
-        end
-      end
-
-      tasks_cpy = tasks.dup
-  
-      entries = {}
-
-      hours.each_with_index do |h, i|
-        date = dates[i]
-
-        slots = []
-        slots_num = (h / 0.5).to_i
-        slots_num.times do |n|
-          t = tasks_cpy.sample
-          t[:hours] -= 0.5
-          
-          slots << {
-            'project_id' => t[:pid],
-            'task_id' => t[:tid],
-            'spent_date' => date.to_s,
-            'hours' => 0.5
-          }
-
-          if t[:hours] <= 0
-            tasks_cpy.delete t
-          end
-        end
-
-        tasks.each do |t|
-          slots_per_task = slots.select do |s|
-            t[:pid] == s['project_id'] && t[:tid] == s['task_id']
-          end
-
-          if !slots_per_task.empty?
-            entry = slots_per_task.first
-            entry['hours'] = slots_per_task.inject(0) { |sum, s| sum + s['hours'] }
-            # puts entry
-
-            daily_tasks = entries[date] || []
-            entries[date] = daily_tasks if daily_tasks.empty?
-            
-            daily_tasks << {
-              :project => t[:pname],
-              :project_code => t[:pcode],
-              :task => t[:tname],
-              :client => t[:client],
-              :hours => entry['hours'],
-              :project_id => t[:pid],
-              :task_id => t[:tid],
-              :spent_date => entry['spent_date'],
-            }
-
-            daily_tasks.shuffle!
-          end
-        end
-      end
-
-      print_time_entries mon, fri, entries
-
-      puts ''
-      puts "A random set of time entries (from #{mon} to #{fri}) generated, submit now? (Y/n)"
-      confirm = $stdin.gets.chomp
-      abort 'Submit cancelled' unless confirm == 'Y'
-
-      post_data = entries.values.flatten.map do |e|
-        {
-          'user_id' => $user_id,
-          'project_id' => e[:project_id],
-          'task_id' => e[:task_id],
-          'spent_date' => e[:spent_date],
-          'hours' => e[:hours]
-        }
-      end
-
-      progressbar = ProgressBar.create(
-        :title => 'Submitting', 
-        :total => post_data.size,
-        :format => '%t %c/%C %B'
-      )
-      
-      post_data.each do |e|
-        rsp = post 'time_entries', e
-        if rsp 
-          progressbar.increment
-        else
-          abort "Submit request failed. Your submit actions may not be completed. Please run `reaper show #{date_str}` to check."
-        end
-      end
-
-      puts "#{post_data.size} time entries submitted successfully. You can run `reaper show #{date_str}` to check."
+      submit_time_entries date_str, options[:excluded]
     end
     
     no_commands do
@@ -728,9 +595,213 @@ module Reaper
         table.style = { :all_separators => true }
         puts table
       end
+
+      def submit_time_entries(date_str, excluded_weekdays_str)
+        mon, fri = get_week_range_from_date_str date_str
+        
+        if excluded_weekdays_str && !excluded_weekdays_str.empty?
+          excluded_weekdays = excluded_weekdays_str
+            .split(',')
+            .map { |s| s.strip.downcase }
+            .uniq
+
+          valid_weekdays = %w(mon tue wed thu fri)
+          unless (excluded_weekdays - valid_weekdays).empty? && excluded_weekdays.size < valid_weekdays.size
+            abort "Argument 'excluded' contains invalid options. Only single or multiple values (comma separated) in #{valid_weekdays} is allowed."
+          end
+
+          excluded_weekdays_offset = excluded_weekdays.map { |d| valid_weekdays.index d }.sort
+        end
+        
+        has_excluded = excluded_weekdays_offset != nil && !excluded_weekdays_offset.empty?
+
+        Reaper.check_auth
+
+        abort 'Cannot find Reaper configuration. Please run `reaper config update` first.' unless Reaper.load_config
+
+        _, existing_entries = show date_str
       
+        if existing_entries
+          num = existing_entries.values.map { |v| v.size }.inject(:+)
+          
+          if num > 0
+            puts ''
+
+            is_clean_after_excluded = false
+
+            if has_excluded
+              entries = existing_entries.select { |k, v| !(excluded_weekdays_offset.include? (k - mon)) }
+              if entries.values.map { |v| v.size }.inject(:+) > 0
+                abort "You have existing time entries within the specified date range. Reaper submit won't work in this case.\nIf you are sure they can be removed, please run `reaper delete #{date_str}` first."
+              else
+                is_clean_after_excluded = true
+              end
+            end
+
+            if !is_clean_after_excluded
+              non_vocation_entries = existing_entries.select do |k, v|
+                case v.size
+                when 0
+                  false
+                when 1
+                  entry = v.first
+                  entry[:client] != 'Time Off' || entry[:hours] != 8
+                else
+                  true
+                end
+              end
+
+              # all the entries are 8 hours vacation/public holiday/sick leave
+              if non_vocation_entries.empty?
+                case num
+                when 5
+                  abort "All 5 days within the specified week have been marked as 'Time Off'. Reaper submit won't work in this case.\nIf you are sure they can be removed, please run `reaper delete #{date_str}` first."
+                else
+                  puts "#{num} days within the specified week have been marked as 'Time Off'. Do you want to exclude them and submit time entries for the rest of the days? (Y/n)"
+                  excluded_dates = existing_entries.select { |k, v| !v.empty? }.keys
+                  excluded_arg = excluded_dates.map { |d| d.strftime('%a') }.join(',')
+
+                  confirm = $stdin.gets.chomp
+                  abort unless confirm == 'Y'
+                  submit_time_entries date_str, excluded_arg
+                  return
+                end
+              end
+
+              abort "You have existing time entries within the specified date range. Reaper submit won't work in this case.\nIf you are sure they can be removed, please run `reaper delete #{date_str}` first."
+            end
+          end
+        end
+
+        hours_per_day = 8
+        days = has_excluded ? 5 - excluded_weekdays_offset.size : 5
+        
+        dates = []
+        5.times { |n| dates << mon + n if !has_excluded || !(excluded_weekdays_offset.include? n) }
+        
+        hours = []
+
+        negative_offset_days = 0
+        days.times do |_|
+          # we don't want you to always work less than 8 hours, 
+          # 2 is the max number of your less working days
+          is_positive_offset = negative_offset_days <= 2 ? [true, false].sample : true
+          negative_offset_days += 1 unless is_positive_offset
+        
+          offset = is_positive_offset ? $config[:daily_positive_offset] : $config[:daily_negative_offset]
+          offset = round_hours(rand() * offset) * (is_positive_offset ? 1 : -1)
+          hours << offset + hours_per_day
+        end
+
+        total_hours = hours.inject(:+)
+
+        tasks = $config[:tasks]
+
+        tasks_hours = 0
+        tasks.each_with_index do |t, i|
+          if i < tasks.size - 1
+            t[:hours] = round_hours(total_hours * t[:percentage])
+            tasks_hours += t[:hours]
+          else
+            t[:hours] = total_hours - tasks_hours
+          end
+        end
+
+        tasks_cpy = tasks.dup
+      
+        entries = {}
+
+        hours.each_with_index do |h, i|
+          date = dates[i]
+
+          slots = []
+          slots_num = (h / 0.5).to_i
+          slots_num.times do |n|
+            t = tasks_cpy.sample
+            t[:hours] -= 0.5
+
+            slots << {
+              'project_id' => t[:pid],
+              'task_id' => t[:tid],
+              'spent_date' => date.to_s,
+              'hours' => 0.5
+            }
+
+            if t[:hours] <= 0
+              tasks_cpy.delete t
+            end
+          end
+
+          tasks.each do |t|
+            slots_per_task = slots.select do |s|
+              t[:pid] == s['project_id'] && t[:tid] == s['task_id']
+            end
+
+            if !slots_per_task.empty?
+              entry = slots_per_task.first
+              entry['hours'] = slots_per_task.inject(0) { |sum, s| sum + s['hours'] }
+              # puts entry
+
+              daily_tasks = entries[date] || []
+              entries[date] = daily_tasks if daily_tasks.empty?
+
+              daily_tasks << {
+                :project => t[:pname],
+                :project_code => t[:pcode],
+                :task => t[:tname],
+                :client => t[:client],
+                :hours => entry['hours'],
+                :project_id => t[:pid],
+                :task_id => t[:tid],
+                :spent_date => entry['spent_date'],
+              }
+
+              daily_tasks.shuffle!
+            end
+          end
+        end
+
+        print_time_entries mon, fri, entries
+
+        puts ''
+
+        range = "from #{mon} to #{fri}"
+        range << ", #{excluded_weekdays.join(', ')} excluded" if has_excluded
+
+        puts "A random set of time entries (#{range}) generated, submit now? (Y/n)"
+        confirm = $stdin.gets.chomp
+        abort 'Submit cancelled' unless confirm == 'Y'
+
+        post_data = entries.values.flatten.map do |e|
+          {
+            'user_id' => $user_id,
+            'project_id' => e[:project_id],
+            'task_id' => e[:task_id],
+            'spent_date' => e[:spent_date],
+            'hours' => e[:hours]
+          }
+        end
+
+        progressbar = ProgressBar.create(
+          :title => 'Submitting', 
+          :total => post_data.size,
+          :format => '%t %c/%C %B'
+        )
+
+        post_data.each do |e|
+          rsp = post 'time_entries', e
+          if rsp 
+            progressbar.increment
+          else
+            abort "Submit request failed. Your submit actions may not be completed. Please run `reaper show #{date_str}` to check."
+          end
+        end
+
+        puts "#{post_data.size} time entries submitted successfully. You can run `reaper show #{date_str}` to check."
+      end
+
       # helpers
-  
+      
       def num_to_hours(num)
         num
       end
