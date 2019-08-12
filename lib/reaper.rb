@@ -781,6 +781,13 @@ module Reaper
         return mon, (mon + 4)
       end
     end
+
+    desc "donate", "Buy me a milktea ❤️"
+    def donate
+      puts 'If you think Reaper saves your time, please consider buying the author a milktea ❤️'
+      pay_img = File.join Reaper.root, 'assets/alipay.jpg'
+      `qlmanage -p #{pay_img} 2>/dev/null`
+    end
   
     desc "version", "Show current Reaper version"
     def version
