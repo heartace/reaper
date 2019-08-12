@@ -10,5 +10,14 @@ require "reaper"
 # require "pry"
 # Pry.start
 
-require "irb"
-IRB.start(__FILE__)
+# require "irb"
+# IRB.start(__FILE__)
+
+# capture ctrl+c and show a simple message before quitting
+trap 'SIGINT' do
+  puts ''
+  puts 'Reaper terminated by user'
+  exit 130
+end
+
+Reaper::Main.start(ARGV)

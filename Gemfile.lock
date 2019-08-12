@@ -2,6 +2,9 @@ PATH
   remote: .
   specs:
     reaper (0.1.0)
+      ruby-progressbar (~> 1.10.1)
+      terminal-table (~> 1.8.0)
+      thor (~> 0.20.3)
 
 GEM
   remote: https://rubygems.org/
@@ -21,6 +24,11 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.8.0)
     rspec-support (3.8.2)
+    ruby-progressbar (1.10.1)
+    terminal-table (1.8.0)
+      unicode-display_width (~> 1.1, >= 1.1.1)
+    thor (0.20.3)
+    unicode-display_width (1.6.0)
 
 PLATFORMS
   ruby

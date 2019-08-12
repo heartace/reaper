@@ -1,0 +1,316 @@
+<!DOCTYPE>
+<html>
+  <header>
+    <style>
+      body {
+        font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.4;
+        color: #333;
+      }
+
+      ul#tasks {
+        background-color: #efefef;
+      }
+
+      div {
+        display: block;
+      }
+
+      p {
+        display: block;
+        margin-block-start: 1em;
+        margin-block-end: 1em;
+        margin-inline-start: 0px;
+        margin-inline-end: 0px;
+      }
+
+      p#error-msg {
+        color: #ff0000;
+      }
+
+      hr {
+        display: block;
+        height: 1px;
+        border: 0;
+        border-top: 1px solid #ccc;
+        margin: 1em 0;
+        padding: 0;
+      }
+    </style>
+    <script>
+      var globalSettings = "{{RPR_GLOBAL_SETTINGS}}";
+
+      var projects = "{{RPR_PROJECTS}}";
+      
+      var addedTasks = "{{RPR_ADDED_TASKS}}";
+
+      function updateTaskPickerByProject(p) {
+        var taskPicker = document.getElementById('task_picker');
+        while (taskPicker.options.length > 0) {                
+          taskPicker.remove(0);
+        }
+
+        var tasks = p.tasks;
+
+        for (var i = 0; i < tasks.length; i++) {
+          var t = tasks[i];
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.innerHTML = t.name
+          taskPicker.appendChild(opt);
+        }
+      }
+
+      function init() {
+        // projects = [{
+        //   pid: 1,
+        //   code: 'COD-A',
+        //   name: "Kapsool Website Frontend Development",
+        //   client: "Kapsool",
+        //   tasks: [{
+        //     tid: 11,
+        //     name: "Frontend Development"
+        //   }]
+        // },
+        // {
+        //   pid: 2,
+        //   code: 'BPS-A',
+        //   name: "BASF Website Development",
+        //   client: "BASF",
+        //   tasks: [{
+        //     tid: 12,
+        //     name: "Frontend Development"
+        //   },
+        //   {
+        //     tid: 13,
+        //     name: "Technical Direction"
+        //   }]
+        // }];
+
+        // addedTasks = [{
+        //   pid: 2,
+        //   tid: 13,
+        //   pct: 0.2
+        // },
+        // {
+        //   pid: 1,
+        //   tid: 11,
+        //   pct: 0.8
+        // }];
+
+        if (projects === "{{" + "RPR_PROJECTS" + "}}") {
+          document.body.innerHTML = "<h1>Reaper Configuration</h1><p>Don't Be Naughty.</p><p>This page is supposed to be launched by Reaper only.</p>"
+          return;
+        }
+
+        document.getElementById('negative-daily-offset').value = globalSettings.noffset;
+        document.getElementById('positive-daily-offset').value = globalSettings.poffset;
+        
+        var lastClient = null;
+
+        var projPicker = document.getElementById('proj_picker');
+        
+        for (var i = 0; i < projects.length; i++) {
+          var p = projects[i];
+
+          var client = p.client;
+
+          if (!lastClient || lastClient !== client) {
+            var optgroup = document.createElement('optgroup');
+            optgroup.label = client;
+            projPicker.appendChild(optgroup);
+            lastClient = client;
+          }
+
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.innerHTML = "[" + p.code + "] " + p.name;
+          projPicker.appendChild(opt);
+        }
+
+        if (projects.length > 0) {
+          updateTaskPickerByProject(projects[0]);
+        }
+
+        for (var i = 0; i < addedTasks.length; i++) {
+          var t = addedTasks[i];
+
+          var proj = projects.find(function(p) {
+            return p.pid == t.pid
+          });
+
+          var task = proj.tasks.find(function(t) {
+            return t.tid == t.tid
+          });
+
+          addTask(i, t.pid, proj.name, t.tid, task.name, t.pct);
+        }
+      }
+
+      function onProjectPickerChanged() {
+        var projPicker = document.getElementById('proj_picker');
+        var p = projects[projPicker.selectedIndex];
+        updateTaskPickerByProject(p);
+      }
+
+      function addSelectedTask() {
+        clearError();
+
+        var projPicker = document.getElementById('proj_picker');
+        var taskPicker = document.getElementById('task_picker');
+
+        var pindex = projPicker.selectedIndex;
+        var tindex = taskPicker.selectedIndex;
+
+        var p = projects[pindex];
+        var t = p.tasks[tindex];
+
+        for (var i = 0; i < addedTasks.length; i++) {
+          var task = addedTasks[i];
+          if (task.pid === p.pid && task.tid == t.tid) {
+            showError("Task already added!");
+            return;
+          }
+        }
+        
+        addTask(addedTasks.length, p.pid, p.name, t.tid, t.name, 0);
+
+        addedTasks.push({
+          pid: p.pid,
+          tid: t.tid
+        });
+      }
+
+      function addTask(index, pid, project, tid, task, percentage) {
+        var percentageId = "percentage-" + index;
+        var p = Math.round(percentage * 100);
+
+        var ul = document.getElementById('tasks');
+        var li = document.createElement('li');
+        li.innerHTML = "<h3>" + project + "</h3>" +
+          "<p>" + task + "</p>" +
+          "<div>" +
+            "<label for=\"" + percentageId + "\">Percentage (1-100, integer only): </label>" +
+            "<input id=\"" + percentageId + "\" type=\"text\" value=\"" + p + "\">" +
+          "</div>" +
+          "<button onclick=\"removeTask(this)\">Remove</button>";
+        ul.appendChild(li);
+      }
+
+      function removeTask(e) {
+        clearError();
+
+        var li = e.parentElement;
+        
+        var index = 0;
+        var ele = li;
+        while((ele = ele.previousElementSibling) != null) ++index;
+        
+        li.remove();
+
+        addedTasks.splice(index, 1);
+      }
+
+      function update() {
+        clearError();
+
+        if (addedTasks.length == 0) {
+          showError("You didn't add any tasks!");
+          return;
+        }
+
+        var noffset = parseInt(document.getElementById('negative-daily-offset').value);
+        var poffset = parseInt(document.getElementById('positive-daily-offset').value);
+
+        if (isNaN(noffset) || noffset < 0 || noffset > 4) {
+          showError("Daily working hours negative offset is invalid!");
+          return;
+        }
+
+        if (isNaN(poffset) || poffset < 0 || poffset > 4) {
+          showError("Daily working hours positive offset is invalid!");
+          return;
+        }
+
+        var percentageList = [];
+        var taskLis = document.getElementById('tasks').getElementsByTagName('li');
+        for (var i = 0; i < taskLis.length; i++) {
+          var li = taskLis[i];
+          var percentage = parseInt(document.getElementById('percentage-' + i).value);
+          if (isNaN(percentage) || percentage <= 0 || percentage > 100) {
+            showError("Percentage at row " + (i + 1) + " is invalid!");
+            return;
+          }
+          percentageList.push(percentage);
+        }
+
+        sum = percentageList.reduce((acc, cur) => acc + cur, 0);
+        
+        if (sum != 100) {
+          showError("The sum of all percentage values must be 100!");
+          return;
+        }
+
+        document.body.innerHTML = "<h1>Reaper Configuration</h1><p>Update successfully. You may now close this webpage safely and go back to your terminal.</p>"
+
+        var params = [];
+        for (var i = 0; i < addedTasks.length; i++) {
+          var t = addedTasks[i];
+          var pct = percentageList[i];
+          params.push("p" + i + "=" + t.pid + "&t" + i + "=" + t.tid + "&pct" + i + "=" + pct);
+        }
+
+        var url = "http://localhost:31390/submitTimeEntries?no=" + noffset + "&po=" + poffset +"&" + params.join('&');
+        sendRequest(url);
+      }
+
+      function sendRequest(url) {
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.open("GET", url, false); // false for synchronous request
+        xmlHttp.send(null);
+        return xmlHttp.responseText;
+      }
+
+      function showError(msg) {
+        document.getElementById('error-msg').innerText = msg;
+      }
+
+      function clearError() {
+        showError('');
+      }
+    </script>
+  </header>
+  <body onload="init()">
+    <h1>Reaper Configuration</h1>
+    <h2>Global Settings</h2>
+    <div>
+      <label for="negative-daily-offset">Daily working hours negative offset (0-4, integer only): </label>
+      <input id="negative-daily-offset" type="text" value="0">
+    </div>
+    <div>
+      <label for="positive-daily-offset">Daily working hours positive offset (0-4, integer only): </label>
+      <input id="positive-daily-offset" type="text" value="0">
+    <div>
+    <h2>Projects & Tasks Settings</h2>
+    <div>
+      <div>
+        <select id="proj_picker" onchange="onProjectPickerChanged()"></select>
+        <select id="task_picker"></select>
+        <button onclick="addSelectedTask()">Add</button>
+      </div>
+      <ul id="tasks"></ul>
+    </div>
+    <div>
+      <p id="error-msg"></p>
+    </div>
+    <button onclick="update()">OK</button>
+    <hr>
+    <div>
+      <p>Reaper: A Harvest time entries filling helper</p>
+      <p><i>Keep your PM away (TM)</i></p>
+      <p>"Keep your PM away" is a trademark of heartace (or not</p>
+      <p>&copy;2019 heartace</p>
+    </div>
+  </body>
+</html>
