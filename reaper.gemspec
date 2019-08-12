@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require "reaper/version"
 
 Gem::Specification.new do |spec|
-  spec.name          = "reaper"
+  spec.name          = "harvest-reaper"
   spec.version       = Reaper::VERSION
   spec.authors       = ["heartace"]
   spec.email         = ["_@derek.app"]
