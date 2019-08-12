@@ -388,9 +388,17 @@ module Reaper
     def me
       Reaper.check_auth
 
-      puts "Fetching your profile, raw data will be directly shown here"
-      puts ''
-      puts JSON.pretty_generate Reaper.request 'users/me'
+      puts "Fetching your Harvest profile..."
+      rsp = Reaper.request 'users/me'
+
+      if rsp
+        rsp.each { |k, v| rsp[k] = v.scan(/.{1,30}/).join("\n") if (v && v.to_s.size > 30) }
+
+        title = 'Harvest Profile'
+        rows = rsp.to_a
+        table = Terminal::Table.new :title => title, :rows => rows
+        puts table
+      end
     end
 
     desc "config SUBCOMMAND", "Manage your Reaper configuration"
