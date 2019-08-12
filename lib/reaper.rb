@@ -413,7 +413,7 @@ module Reaper
       to = fri.to_s
       
       puts "Fetching your time entries from #{from} to #{to}"
-      raw_entries = Reaper.request("time_entries?from=#{from}&to=#{to}")['time_entries']
+      raw_entries = Reaper.request("time_entries?user_id=#{$user_id}&from=#{from}&to=#{to}")['time_entries']
   
       if raw_entries.empty?
         puts "Cannot find any time entries in the week of #{from}" 
