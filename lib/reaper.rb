@@ -812,7 +812,7 @@ N+.  `/hMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"
 
       slogan = 'Keep your PM away (TM)'
       slogan_len = slogan.length + 4
-      puts "#{sickle}\n\n#{'*' * slogan_len}\n* #{slogan} *\n#{'*' * slogan_len}\n\nReaper: A Harvest time entries filling helper. \nVersion 0.1"
+      puts "#{sickle}\n\n#{'*' * slogan_len}\n* #{slogan} *\n#{'*' * slogan_len}\n\nReaper: A smart Harvest filling helper. \nVersion #{Reaper::VERSION}"
     end
   end
 end
