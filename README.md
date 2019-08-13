@@ -1,3 +1,5 @@
+[![Gem Version](https://badge.fury.io/rb/harvest-reaper.svg)](https://badge.fury.io/rb/harvest-reaper)
+
 # Reaper
 
 `Reaper` is a smart Harvest filling helepr. 
