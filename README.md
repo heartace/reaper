@@ -68,7 +68,7 @@ reaper config delete
 
 ## Overview
 
-A `time entry` is the minimum unit of a Harvest record. You can create time entries with two types: via **duration ** or via **start and end time**. Reaper only supports creating time entries via duration.
+A `time entry` is the minimum unit of a Harvest record. You can create time entries with two types: via **duration** or via **start and end time**. Reaper only supports creating time entries via duration.
 
 ![image](https://user-images.githubusercontent.com/669206/62857084-43c7ff00-bd29-11e9-8463-304a1050521e.png)
 
