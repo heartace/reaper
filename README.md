@@ -1,8 +1,10 @@
-[![Gem Version](https://badge.fury.io/rb/harvest-reaper.svg)](https://badge.fury.io/rb/harvest-reaper)
-
 # Reaper
 
+[![Gem Version](https://badge.fury.io/rb/harvest-reaper.svg)](https://badge.fury.io/rb/harvest-reaper)
+
 `Reaper` is a smart Harvest filling helper. 
+
+# Basic Usage
 
 Usually you only need three steps:
 
