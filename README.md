@@ -2,7 +2,7 @@
 
 # Reaper
 
-`Reaper` is a smart Harvest filling helepr. 
+`Reaper` is a smart Harvest filling helper. 
 
 Usually you only need three steps:
 
