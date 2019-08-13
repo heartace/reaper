@@ -148,3 +148,7 @@ reaper submit 0812 --excluded mon,wed
 Reaper will exclude Monday and Wedesday, but only calculate and submit the time entries for the rest of 3 days.
 
 The valid options for `—excluded` are `mon, tue, wed, thu, fri`. You could provide 1 - 4 weekdays. If multiple weekdays are provided, separate them by commas.
+
+# Milktea Time
+
+If you find Reaper saves your time a lot, please consider running `reaper donate` and buy me a milktea. ❤️
